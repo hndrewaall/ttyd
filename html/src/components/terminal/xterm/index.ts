@@ -125,6 +125,11 @@ export class Xterm {
             d.dispose();
         }
         this.disposables.length = 0;
+        if (this.reconnectTimer !== null) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.visibilityHandlerInstalled = false;
     }
 
     @bind
@@ -276,20 +281,23 @@ export class Xterm {
     private installVisibilityHandler() {
         if (this.visibilityHandlerInstalled) return;
         this.visibilityHandlerInstalled = true;
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible') return;
-            const state = this.socket?.readyState;
-            const socketDown = state === undefined || state === WebSocket.CLOSED || state === WebSocket.CLOSING;
-            if (!socketDown) return;
-            if (!this.reconnect) return;
-            console.log('[ttyd] tab visible + socket down -> immediate reconnect');
-            if (this.reconnectTimer !== null) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
-            }
-            this.reconnectDelay = 1000;
-            this.refreshToken().then(this.connect);
-        });
+        const { register } = this;
+        register(
+            addEventListener(document, 'visibilitychange', () => {
+                if (document.visibilityState !== 'visible') return;
+                const state = this.socket?.readyState;
+                const socketDown = state === undefined || state === WebSocket.CLOSED || state === WebSocket.CLOSING;
+                if (!socketDown) return;
+                if (!this.reconnect) return;
+                console.log('[ttyd] tab visible + socket down -> immediate reconnect');
+                if (this.reconnectTimer !== null) {
+                    clearTimeout(this.reconnectTimer);
+                    this.reconnectTimer = null;
+                }
+                this.reconnectDelay = 1000;
+                this.refreshToken().then(this.connect);
+            })
+        );
     }
 
     @bind
